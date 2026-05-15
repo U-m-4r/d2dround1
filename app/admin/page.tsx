@@ -15,6 +15,15 @@ interface TeamEntry {
   totalWrongAttempts: number
 }
 
+interface LeaderboardData {
+  rank: number
+  teamName: string
+  solvedCount: number
+  currentLevel: number
+  lastSolvedAt: string | null
+  suspicious?: boolean
+}
+
 interface Submission {
   id: string
   teamName: string
@@ -34,7 +43,7 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>('leaderboard')
 
   // Data
-  const [leaderboard, setLeaderboard] = useState<TeamEntry[]>([])
+  const [leaderboard, setLeaderboard] = useState<LeaderboardData[]>([])
   const [teams, setTeams] = useState<TeamEntry[]>([])
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [unlocking, setUnlocking] = useState<string | null>(null)
