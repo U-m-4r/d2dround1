@@ -83,6 +83,7 @@ const TEST_TEAMS = [
   { teamName: 'Team Alpha', password: 'alpha123' },
   { teamName: 'Team Beta',  password: 'beta456'  },
   { teamName: 'Team Gamma', password: 'gamma789' },
+  { teamName: 'Team Delta', password: 'delta101' },
 ]
 
 async function seed() {
