@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSessionFromCookies } from '@/lib/auth'
 import { connectDB } from '@/lib/db'
+import { isRoundStarted, isRoundPaused, isRoundEnded } from '@/lib/round'
 import Team from '@/models/Team'
 import Clue from '@/models/Clue'
 
@@ -13,6 +14,27 @@ export async function GET() {
 
   try {
     await connectDB()
+
+    if (!(await isRoundStarted())) {
+      return NextResponse.json(
+        { error: 'ROUND_NOT_STARTED', message: 'The round has not started yet.' },
+        { status: 403 }
+      )
+    }
+
+    if (await isRoundPaused()) {
+      return NextResponse.json(
+        { error: 'ROUND_PAUSED', message: 'The round is currently paused for a break.' },
+        { status: 403 }
+      )
+    }
+
+    if (await isRoundEnded()) {
+      return NextResponse.json(
+        { error: 'ROUND_ENDED', message: 'The round has ended.' },
+        { status: 403 }
+      )
+    }
 
     const team = await Team.findById(session.teamId).select('currentLevel solvedCount')
     if (!team) {

@@ -22,6 +22,7 @@ interface LeaderboardData {
   currentLevel: number
   lastSolvedAt: string | null
   suspicious?: boolean
+  totalWrongAttempts?: number
 }
 
 interface Submission {
@@ -32,6 +33,13 @@ interface Submission {
   isCorrect: boolean
   submittedAt: string
   ipAddress: string
+}
+
+interface RoundStatus {
+  isStarted: boolean
+  isPaused?: boolean
+  isEnded?: boolean
+  startedAt: string | null
 }
 
 type Tab = 'leaderboard' | 'teams' | 'submissions'
@@ -50,6 +58,9 @@ export default function AdminPage() {
   const [unlockMsg, setUnlockMsg] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
+  const [roundStatus, setRoundStatus] = useState<RoundStatus>({ isStarted: false, startedAt: null })
+  const [roundBusy, setRoundBusy] = useState(false)
+  const [roundMsg, setRoundMsg] = useState('')
 
   const headers = { 'x-admin-secret': secret }
 
@@ -57,10 +68,11 @@ export default function AdminPage() {
     if (!secret) return
     setRefreshing(true)
     try {
-      const [lbRes, teamsRes, subRes] = await Promise.all([
+      const [lbRes, teamsRes, subRes, roundRes] = await Promise.all([
         fetch('/api/leaderboard', { headers }),
         fetch('/api/admin/teams', { headers }),
         fetch('/api/admin/submissions?limit=100', { headers }),
+        fetch('/api/round/status'),
       ])
       if (lbRes.ok) {
         const d = await lbRes.json()
@@ -73,6 +85,10 @@ export default function AdminPage() {
       if (subRes.ok) {
         const d = await subRes.json()
         setSubmissions(d.submissions)
+      }
+      if (roundRes.ok) {
+        const d = await roundRes.json()
+        setRoundStatus(d)
       }
       setLastRefresh(new Date())
     } catch {
@@ -128,6 +144,76 @@ export default function AdminPage() {
     } finally {
       setUnlocking(null)
       setTimeout(() => setUnlockMsg(''), 4000)
+    }
+  }
+
+  const handleStartRound = async () => {
+    setRoundBusy(true)
+    setRoundMsg('')
+    try {
+      const res = await fetch('/api/admin/round/start', {
+        method: 'POST',
+        headers,
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setRoundStatus({ isStarted: true, isPaused: false, isEnded: false, startedAt: data.startedAt || new Date().toISOString() })
+        setRoundMsg('✓ Round started.')
+        fetchAll()
+      } else {
+        setRoundMsg(`⚠ ${data.message || 'Unable to start round.'}`)
+      }
+    } catch {
+      setRoundMsg('Connection error.')
+    } finally {
+      setRoundBusy(false)
+      setTimeout(() => setRoundMsg(''), 4000)
+    }
+  }
+
+  const handleStopRound = async (action: 'pause' | 'end') => {
+    setRoundBusy(true)
+    setRoundMsg('')
+    try {
+      const res = await fetch('/api/admin/round/stop', { 
+        method: 'POST', 
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action })
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setRoundStatus(prev => ({ ...prev, isPaused: data.isPaused, isEnded: data.isEnded }))
+        setRoundMsg(`✓ Round ${action === 'end' ? 'ended' : 'paused'}.`)
+        fetchAll()
+      } else {
+        setRoundMsg(`⚠ ${data.message || `Unable to ${action} round.`}`)
+      }
+    } catch {
+      setRoundMsg('Connection error.')
+    } finally {
+      setRoundBusy(false)
+      setTimeout(() => setRoundMsg(''), 4000)
+    }
+  }
+
+  const handleResumeRound = async () => {
+    setRoundBusy(true)
+    setRoundMsg('')
+    try {
+      const res = await fetch('/api/admin/round/resume', { method: 'POST', headers })
+      const data = await res.json()
+      if (res.ok) {
+        setRoundStatus(prev => ({ ...prev, isPaused: false, isEnded: false }))
+        setRoundMsg('✓ Round resumed.')
+        fetchAll()
+      } else {
+        setRoundMsg(`⚠ ${data.message || 'Unable to resume round.'}`)
+      }
+    } catch {
+      setRoundMsg('Connection error.')
+    } finally {
+      setRoundBusy(false)
+      setTimeout(() => setRoundMsg(''), 4000)
     }
   }
 
@@ -190,9 +276,76 @@ export default function AdminPage() {
           <span className="font-mono text-sm text-neon-pink tracking-widest">D2D ADMIN CONSOLE</span>
         </div>
         <div className="flex items-center gap-4">
+          <span className={`font-mono text-xs ${roundStatus.isStarted ? (roundStatus.isEnded ? 'text-neon-pink' : roundStatus.isPaused ? 'text-neon-pink' : 'text-neon-green') : 'text-neon-pink'}`}>
+            {roundStatus.isStarted ? (roundStatus.isEnded ? 'ROUND ENDED' : roundStatus.isPaused ? 'ROUND PAUSED' : 'ROUND ACTIVE') : 'ROUND WAITING'}
+          </span>
+          {!roundStatus.isStarted && (
+            <button
+              onClick={handleStartRound}
+              disabled={roundBusy}
+              className="font-mono text-xs text-neon-green hover:text-white transition-colors disabled:opacity-40"
+            >
+              {roundBusy ? 'STARTING...' : '▶ START ROUND'}
+            </button>
+          )}
+          {roundStatus.isStarted && !roundStatus.isEnded && (
+            <div className="flex gap-2">
+              {!roundStatus.isPaused ? (
+                <button
+                  onClick={() => handleStopRound('pause')}
+                  disabled={roundBusy}
+                  className="font-mono text-xs text-neon-pink hover:text-white transition-colors disabled:opacity-40"
+                  title="Pause round for lunch break"
+                >
+                  {roundBusy ? 'PAUSING...' : '⏸ PAUSE ROUND'}
+                </button>
+              ) : (
+                <button
+                  onClick={handleResumeRound}
+                  disabled={roundBusy}
+                  className="font-mono text-xs text-neon-green hover:text-white transition-colors disabled:opacity-40"
+                >
+                  {roundBusy ? 'RESUMING...' : '▶ RESUME ROUND'}
+                </button>
+              )}
+              <button
+                onClick={() => handleStopRound('end')}
+                disabled={roundBusy}
+                className="font-mono text-xs text-neon-pink hover:text-white transition-colors disabled:opacity-40"
+                title="End round and close submissions"
+              >
+                {roundBusy ? 'ENDING...' : '⏹ END ROUND'}
+              </button>
+            </div>
+          )}
+          {roundStatus.isStarted && roundStatus.isEnded && (
+            <div className="flex gap-2">
+              <button
+                onClick={handleResumeRound}
+                disabled={roundBusy}
+                className="font-mono text-xs text-neon-green hover:text-white transition-colors disabled:opacity-40"
+                title="Resume the round without resetting the timer"
+              >
+                {roundBusy ? 'RESUMING...' : '▶ RESUME ROUND'}
+              </button>
+              <button
+                onClick={handleStartRound}
+                disabled={roundBusy}
+                className="font-mono text-xs text-neon-pink hover:text-white transition-colors disabled:opacity-40"
+                title="Completely restart the round and reset the timer"
+              >
+                {roundBusy ? 'RESTARTING...' : '↻ RESTART ROUND'}
+              </button>
+            </div>
+          )}
           {lastRefresh && (
             <span className="font-mono text-xs text-white/20">
               LAST SYNC: {lastRefresh.toLocaleTimeString()}
+            </span>
+          )}
+          {roundStatus.startedAt && (
+            <span className="font-mono text-xs text-white/20">
+              STARTED: {new Date(roundStatus.startedAt).toLocaleTimeString()}
             </span>
           )}
           <button
@@ -225,14 +378,14 @@ export default function AdminPage() {
 
         {/* Unlock msg toast */}
         <AnimatePresence>
-          {unlockMsg && (
+          {(unlockMsg || roundMsg) && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               className="border border-cyber-cyan/30 bg-cyber-cyan/5 px-4 py-3 font-mono text-xs text-cyber-cyan"
             >
-              {unlockMsg}
+              {unlockMsg || roundMsg}
             </motion.div>
           )}
         </AnimatePresence>

@@ -1,9 +1,8 @@
 import mongoose from 'mongoose'
-
-const MONGODB_URI = process.env.MONGODB_URI!
+import { MONGODB_URI } from '@/lib/env'
 
 if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable in .env.local')
+  throw new Error('Please define the MONGODB_URI environment variable')
 }
 
 // Cached connection for hot-reload in dev

@@ -9,6 +9,7 @@ interface LeaderboardEntry {
   currentLevel: number
   lastSolvedAt: string | null
   suspicious?: boolean
+  totalWrongAttempts?: number
 }
 
 interface LeaderboardTableProps {
@@ -46,7 +47,7 @@ export default function LeaderboardTable({
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b border-neon-green/10">
-            {['RANK', 'TEAM', 'DECODED', 'CURRENT STAGE', 'LAST SOLVE', 'STATUS'].map(
+            {['RANK', 'TEAM', 'DECODED', 'WRONG ATTEMPTS', 'CURRENT STAGE', 'LAST SOLVE', 'STATUS'].map(
               (h) => (
                 <th
                   key={h}
@@ -107,6 +108,21 @@ export default function LeaderboardTable({
                     ))}
                   </div>
                 </div>
+              </td>
+
+              {/* Wrong attempts */}
+              <td className="px-4 py-4">
+                <span
+                  className={`font-mono text-sm font-bold ${
+                    (entry.totalWrongAttempts ?? 0) > 15
+                      ? 'text-neon-pink'
+                      : (entry.totalWrongAttempts ?? 0) > 8
+                        ? 'text-cyber-cyan'
+                        : 'text-white/50'
+                  }`}
+                >
+                  {entry.totalWrongAttempts ?? 0}
+                </span>
               </td>
 
               {/* Current stage */}

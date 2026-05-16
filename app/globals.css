@@ -94,6 +94,7 @@ body::before {
   cursor: pointer;
   transition: all 0.25s ease;
   overflow: hidden;
+  isolation: isolate;
 }
 
 .btn-neon::before {

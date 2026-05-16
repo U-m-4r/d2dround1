@@ -12,6 +12,7 @@ interface LeaderboardEntry {
   currentLevel: number
   lastSolvedAt: string | null
   suspicious?: boolean
+  totalWrongAttempts?: number
 }
 
 export default function LeaderboardPage() {

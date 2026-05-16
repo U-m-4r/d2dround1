@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSessionFromCookies } from '@/lib/auth'
 import { connectDB } from '@/lib/db'
 import { checkRateLimit } from '@/lib/rateLimit'
+import { isRoundStarted, isRoundPaused, isRoundEnded } from '@/lib/round'
 import Team from '@/models/Team'
 import Clue from '@/models/Clue'
 import Submission from '@/models/Submission'
@@ -48,6 +49,27 @@ export async function POST(req: NextRequest) {
 
   try {
     await connectDB()
+
+    if (!(await isRoundStarted())) {
+      return NextResponse.json(
+        { error: 'ROUND_NOT_STARTED', message: 'The round has not started yet.' },
+        { status: 403 }
+      )
+    }
+
+    if (await isRoundPaused()) {
+      return NextResponse.json(
+        { error: 'ROUND_PAUSED', message: 'The round is currently paused for a break.' },
+        { status: 403 }
+      )
+    }
+
+    if (await isRoundEnded()) {
+      return NextResponse.json(
+        { error: 'ROUND_ENDED', message: 'The round has ended.' },
+        { status: 403 }
+      )
+    }
 
     const team = await Team.findById(session.teamId)
     if (!team) {
@@ -97,17 +119,37 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // Correct — advance the team
+    // Correct — advance the team using an atomic DB update to avoid races
     const now = new Date()
     const nextLevel = team.currentLevel + 1
     const isFinished = nextLevel > 5
 
-    await Team.findByIdAndUpdate(team._id, {
-      solvedCount: team.solvedCount + 1,
-      currentLevel: isFinished ? 6 : nextLevel, // 6 = all done
-      lastSolvedAt: now,
-      lastActive: now,
-    })
+    // Attempt to increment solvedCount only if team's currentLevel still equals clueId
+    const updated = await Team.findOneAndUpdate(
+      { _id: team._id, currentLevel: clueId },
+      {
+        $inc: { solvedCount: 1 },
+        $set: {
+          currentLevel: isFinished ? 6 : nextLevel,
+          lastSolvedAt: now,
+          lastActive: now,
+        },
+      },
+      { new: true }
+    )
+
+    if (!updated) {
+      // Concurrent update likely occurred; respond as success but indicate state changed
+      return NextResponse.json({
+        correct: true,
+        message: isFinished
+          ? 'ALL CLUES DECODED. Mission complete.'
+          : `ACCESS GRANTED. Clue ${nextLevel} unlocked.`,
+        newLevel: isFinished ? 6 : nextLevel,
+        isFinished,
+        note: 'state-updated-concurrently',
+      })
+    }
 
     // Mark this clue solved in progress
     await ClueProgress.findOneAndUpdate(

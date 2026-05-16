@@ -24,6 +24,14 @@ if (!MONGODB_URI) {
   process.exit(1)
 }
 
+// Safety: only allow seeding in development by default to avoid accidental
+// insertion of test teams into production databases. To force-run in other
+// environments set FORCE_SEED=true in the environment.
+if (process.env.NODE_ENV !== 'development' && process.env.FORCE_SEED !== 'true') {
+  console.error('❌  Refusing to run seed outside development. Set NODE_ENV=development or FORCE_SEED=true to override.')
+  process.exit(1)
+}
+
 // ── Inline schemas (avoid Next.js module resolution issues in script) ──
 
 const ClueSchema = new mongoose.Schema({

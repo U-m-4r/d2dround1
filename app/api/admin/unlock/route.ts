@@ -5,6 +5,7 @@ import ClueProgress from '@/models/ClueProgress'
 
 function isAdminAuthorized(req: NextRequest): boolean {
   const secret = req.headers.get('x-admin-secret')
+  // Use env var via process here; env validation file will warn in dev
   return secret === process.env.ADMIN_SECRET
 }
 
@@ -37,11 +38,14 @@ export async function POST(req: NextRequest) {
     const now = new Date()
     const nextLevel = clueId + 1
 
-    // Update team state
+    // Update team state atomically: set currentLevel and lastSolvedAt; ensure
+    // solvedCount is at least clueId using $max.
     await Team.findByIdAndUpdate(teamId, {
-      currentLevel: nextLevel > 5 ? 6 : nextLevel,
-      solvedCount: Math.max(team.solvedCount, clueId),
-      lastSolvedAt: now,
+      $set: {
+        currentLevel: nextLevel > 5 ? 6 : nextLevel,
+        lastSolvedAt: now,
+      },
+      $max: { solvedCount: clueId },
     })
 
     // Mark current clue as solved

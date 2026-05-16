@@ -1,7 +1,7 @@
 import jwt from 'jsonwebtoken'
 import { cookies } from 'next/headers'
+import { JWT_SECRET } from '@/lib/env'
 
-const JWT_SECRET = process.env.JWT_SECRET!
 const COOKIE_NAME = 'd2d_session'
 
 export interface JWTPayload {
@@ -11,11 +11,13 @@ export interface JWTPayload {
 }
 
 export function signToken(payload: JWTPayload): string {
+  if (!JWT_SECRET) throw new Error('JWT_SECRET not configured')
   return jwt.sign(payload, JWT_SECRET, { expiresIn: '24h' })
 }
 
 export function verifyToken(token: string): JWTPayload | null {
   try {
+    if (!JWT_SECRET) return null
     return jwt.verify(token, JWT_SECRET) as JWTPayload
   } catch {
     return null
