@@ -225,13 +225,12 @@ export default function LandingPage() {
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.3 }}
-                className={`${
-                  line && line.startsWith('>')
+                className={`${line && line.startsWith('>')
                     ? 'text-neon-green'
                     : line && line.startsWith('//')
-                    ? 'text-white/30 italic'
-                    : 'text-cyber-cyan'
-                }`}
+                      ? 'text-white/30 italic'
+                      : 'text-cyber-cyan'
+                  }`}
               >
                 {line}
               </motion.p>
@@ -243,7 +242,7 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="relative z-10 border-t border-neon-green/8 px-8 py-6 flex items-center justify-between">
-        <span className="font-mono text-xs text-white/20">© 2025 MPC — Decode2Deploy</span>
+        <span className="font-mono text-xs text-white/20">© 2026 MPC — Decode2Deploy</span>
         <span className="font-mono text-xs text-white/20">ALL SYSTEMS OPERATIONAL</span>
       </footer>
     </main>

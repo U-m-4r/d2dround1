@@ -217,6 +217,27 @@ export default function AdminPage() {
     }
   }
 
+  const handleResetRound = async () => {
+    setRoundBusy(true)
+    setRoundMsg('')
+    try {
+      const res = await fetch('/api/admin/round/reset', { method: 'POST', headers })
+      const data = await res.json()
+      if (res.ok) {
+        setRoundStatus({ isStarted: false, isPaused: false, isEnded: false, startedAt: null })
+        setRoundMsg('✓ Round reset to initial state.')
+        fetchAll()
+      } else {
+        setRoundMsg(`⚠ ${data.message || 'Unable to reset round.'}`)
+      }
+    } catch {
+      setRoundMsg('Connection error.')
+    } finally {
+      setRoundBusy(false)
+      setTimeout(() => setRoundMsg(''), 4000)
+    }
+  }
+
   // ── Auth gate ───────────────────────────────────────────────────────
   if (!authed) {
     return (
@@ -270,93 +291,108 @@ export default function AdminPage() {
   return (
     <main className="min-h-screen bg-dark-bg">
       {/* Header */}
-      <div className="border-b border-neon-pink/15 bg-dark-panel px-8 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="D2D Logo" className="w-6 h-6 rounded-full" />
-          <div className="w-2 h-2 rounded-full bg-neon-pink animate-pulse" />
-          <span className="font-mono text-sm text-neon-pink tracking-widest">D2D ADMIN CONSOLE</span>
+      <div className="border-b border-neon-pink/15 bg-dark-panel">
+        {/* Top row: branding + status + meta */}
+        <div className="px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="D2D Logo" className="w-6 h-6 rounded-full" />
+            <div className="w-2 h-2 rounded-full bg-neon-pink animate-pulse" />
+            <span className="font-mono text-sm text-neon-pink tracking-widest">D2D ADMIN CONSOLE</span>
+          </div>
+          <div className="flex items-center gap-6">
+            <span className={`font-mono text-xs px-3 py-1 border rounded-sm ${roundStatus.isStarted ? (roundStatus.isEnded ? 'text-neon-pink border-neon-pink/30 bg-neon-pink/5' : roundStatus.isPaused ? 'text-neon-pink border-neon-pink/30 bg-neon-pink/5' : 'text-neon-green border-neon-green/30 bg-neon-green/5') : 'text-neon-pink border-neon-pink/30 bg-neon-pink/5'}`}>
+              {roundStatus.isStarted ? (roundStatus.isEnded ? '● ROUND ENDED' : roundStatus.isPaused ? '● ROUND PAUSED' : '● ROUND ACTIVE') : '○ ROUND WAITING'}
+            </span>
+            {lastRefresh && (
+              <span className="font-mono text-xs text-white/20">
+                SYNC: {lastRefresh.toLocaleTimeString()}
+              </span>
+            )}
+            {roundStatus.startedAt && (
+              <span className="font-mono text-xs text-white/20">
+                STARTED: {new Date(roundStatus.startedAt).toLocaleTimeString()}
+              </span>
+            )}
+            <button
+              id="admin-refresh-btn"
+              onClick={fetchAll}
+              disabled={refreshing}
+              className="font-mono text-xs text-cyber-cyan hover:text-white transition-colors disabled:opacity-40"
+            >
+              {refreshing ? 'SYNCING...' : '↻ REFRESH'}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-4">
-          <span className={`font-mono text-xs ${roundStatus.isStarted ? (roundStatus.isEnded ? 'text-neon-pink' : roundStatus.isPaused ? 'text-neon-pink' : 'text-neon-green') : 'text-neon-pink'}`}>
-            {roundStatus.isStarted ? (roundStatus.isEnded ? 'ROUND ENDED' : roundStatus.isPaused ? 'ROUND PAUSED' : 'ROUND ACTIVE') : 'ROUND WAITING'}
-          </span>
+
+        {/* Bottom row: round controls */}
+        <div className="px-8 py-3 border-t border-white/5 flex items-center gap-6">
+          <span className="font-mono text-[10px] text-white/20 uppercase tracking-widest mr-2">CONTROLS</span>
+
           {!roundStatus.isStarted && (
             <button
               onClick={handleStartRound}
               disabled={roundBusy}
-              className="font-mono text-xs text-neon-green hover:text-white transition-colors disabled:opacity-40"
+              className="font-mono text-xs text-neon-green hover:text-white border border-neon-green/20 px-4 py-1.5 hover:bg-neon-green/10 transition-all disabled:opacity-40"
             >
               {roundBusy ? 'STARTING...' : '▶ START ROUND'}
             </button>
           )}
+
           {roundStatus.isStarted && !roundStatus.isEnded && (
-            <div className="flex gap-2">
+            <>
               {!roundStatus.isPaused ? (
                 <button
                   onClick={() => handleStopRound('pause')}
                   disabled={roundBusy}
-                  className="font-mono text-xs text-neon-pink hover:text-white transition-colors disabled:opacity-40"
+                  className="font-mono text-xs text-neon-pink hover:text-white border border-neon-pink/20 px-4 py-1.5 hover:bg-neon-pink/10 transition-all disabled:opacity-40"
                   title="Pause round for lunch break"
                 >
-                  {roundBusy ? 'PAUSING...' : '⏸ PAUSE ROUND'}
+                  {roundBusy ? 'PAUSING...' : '⏸ PAUSE'}
                 </button>
               ) : (
                 <button
                   onClick={handleResumeRound}
                   disabled={roundBusy}
-                  className="font-mono text-xs text-neon-green hover:text-white transition-colors disabled:opacity-40"
+                  className="font-mono text-xs text-neon-green hover:text-white border border-neon-green/20 px-4 py-1.5 hover:bg-neon-green/10 transition-all disabled:opacity-40"
                 >
-                  {roundBusy ? 'RESUMING...' : '▶ RESUME ROUND'}
+                  {roundBusy ? 'RESUMING...' : '▶ RESUME'}
                 </button>
               )}
               <button
                 onClick={() => handleStopRound('end')}
                 disabled={roundBusy}
-                className="font-mono text-xs text-neon-pink hover:text-white transition-colors disabled:opacity-40"
+                className="font-mono text-xs text-neon-pink hover:text-white border border-neon-pink/20 px-4 py-1.5 hover:bg-neon-pink/10 transition-all disabled:opacity-40"
                 title="End round and close submissions"
               >
                 {roundBusy ? 'ENDING...' : '⏹ END ROUND'}
               </button>
-            </div>
+            </>
           )}
+
           {roundStatus.isStarted && roundStatus.isEnded && (
-            <div className="flex gap-2">
               <button
                 onClick={handleResumeRound}
                 disabled={roundBusy}
-                className="font-mono text-xs text-neon-green hover:text-white transition-colors disabled:opacity-40"
+                className="font-mono text-xs text-neon-green hover:text-white border border-neon-green/20 px-4 py-1.5 hover:bg-neon-green/10 transition-all disabled:opacity-40"
                 title="Resume the round without resetting the timer"
               >
-                {roundBusy ? 'RESUMING...' : '▶ RESUME ROUND'}
+                {roundBusy ? 'RESUMING...' : '▶ RESUME'}
               </button>
+          )}
+
+          {roundStatus.isStarted && (
+            <>
+              <div className="w-px h-5 bg-white/10" />
               <button
-                onClick={handleStartRound}
+                onClick={handleResetRound}
                 disabled={roundBusy}
-                className="font-mono text-xs text-neon-pink hover:text-white transition-colors disabled:opacity-40"
-                title="Completely restart the round and reset the timer"
+                className="font-mono text-xs text-white/30 hover:text-neon-pink border border-white/10 px-4 py-1.5 hover:border-neon-pink/20 hover:bg-neon-pink/5 transition-all disabled:opacity-40"
+                title="Reset round back to 'not started' state"
               >
-                {roundBusy ? 'RESTARTING...' : '↻ RESTART ROUND'}
+                {roundBusy ? 'RESETTING...' : '↺ RESET'}
               </button>
-            </div>
+            </>
           )}
-          {lastRefresh && (
-            <span className="font-mono text-xs text-white/20">
-              LAST SYNC: {lastRefresh.toLocaleTimeString()}
-            </span>
-          )}
-          {roundStatus.startedAt && (
-            <span className="font-mono text-xs text-white/20">
-              STARTED: {new Date(roundStatus.startedAt).toLocaleTimeString()}
-            </span>
-          )}
-          <button
-            id="admin-refresh-btn"
-            onClick={fetchAll}
-            disabled={refreshing}
-            className="font-mono text-xs text-cyber-cyan hover:text-white transition-colors disabled:opacity-40"
-          >
-            {refreshing ? 'SYNCING...' : '↻ REFRESH'}
-          </button>
         </div>
       </div>
 
