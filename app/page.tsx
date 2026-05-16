@@ -70,6 +70,7 @@ export default function LandingPage() {
       {/* ─── NAV ───────────────────────────────────────────────────── */}
       <nav className="relative z-10 flex items-center justify-between px-8 py-5 border-b border-neon-green/8">
         <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="D2D Logo" className="w-8 h-8 rounded-full" />
           <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse" />
           <span className="font-mono text-sm text-neon-green tracking-widest">
             DECODE2DEPLOY

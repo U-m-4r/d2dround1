@@ -272,6 +272,7 @@ export default function AdminPage() {
       {/* Header */}
       <div className="border-b border-neon-pink/15 bg-dark-panel px-8 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="D2D Logo" className="w-6 h-6 rounded-full" />
           <div className="w-2 h-2 rounded-full bg-neon-pink animate-pulse" />
           <span className="font-mono text-sm text-neon-pink tracking-widest">D2D ADMIN CONSOLE</span>
         </div>

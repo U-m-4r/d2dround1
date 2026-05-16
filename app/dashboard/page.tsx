@@ -338,6 +338,7 @@ export default function DashboardPage() {
       {/* ─── NAV ───────────────────────────────────────────────────── */}
       <nav className="relative z-10 flex items-center justify-between px-6 py-4 border-b border-neon-green/8">
         <div className="flex items-center gap-3">
+          <img src="/logo.png" alt="D2D Logo" className="w-6 h-6 rounded-full" />
           <div className="w-2 h-2 rounded-full bg-neon-green animate-pulse" />
           <span className="font-mono text-xs text-neon-green/60 tracking-widest">D2D MISSION CONTROL</span>
         </div>
