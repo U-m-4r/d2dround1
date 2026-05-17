@@ -26,34 +26,61 @@ export async function GET(req: NextRequest) {
       .sort({ solvedCount: -1, lastSolvedAt: 1 })
       .lean()
 
-    // Enrich leaderboard entries with suspicious/totalWrongAttempts (same logic as admin/teams)
-    const leaderboard = await Promise.all(
-      teams.map(async (team, index) => {
-        const recentWrong = await Submission.countDocuments({
-          teamId: team._id,
-          isCorrect: false,
-          submittedAt: { $gte: new Date(Date.now() - SUSPICIOUS_WINDOW_MINUTES * 60 * 1000) },
-        })
+    // 1. Fetch aggregation stats for all teams in ONE single database query
+    const now = new Date()
+    const fiveMinsAgo = new Date(now.getTime() - SUSPICIOUS_WINDOW_MINUTES * 60 * 1000)
 
-        const totalWrong = await Submission.countDocuments({
-          teamId: team._id,
+    const stats = await Submission.aggregate([
+      {
+        $match: {
           isCorrect: false,
-        })
+        },
+      },
+      {
+        $group: {
+          _id: '$teamId',
+          totalWrong: { $sum: 1 },
+          recentWrong: {
+            $sum: {
+              $cond: [
+                { $gte: ['$submittedAt', fiveMinsAgo] },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ])
 
-        return {
-          rank: index + 1,
-          teamName: team.teamName,
-          solvedCount: team.solvedCount,
-          currentLevel: team.currentLevel,
-          lastSolvedAt: team.lastSolvedAt,
-          lastActive: team.lastActive,
-          createdAt: team.createdAt,
-          teamId: team._id.toString(),
-          suspicious: recentWrong >= SUSPICIOUS_THRESHOLD,
-          totalWrongAttempts: totalWrong,
-        }
-      })
-    )
+    // Convert stats array to a quick O(1) lookup Map
+    const statsMap = new Map<string, { totalWrong: number; recentWrong: number }>()
+    stats.forEach((item) => {
+      if (item._id) {
+        statsMap.set(item._id.toString(), {
+          totalWrong: item.totalWrong || 0,
+          recentWrong: item.recentWrong || 0,
+        })
+      }
+    })
+
+    // 2. Map and enrich team objects quickly without any nested database queries
+    const leaderboard = teams.map((team, index) => {
+      const teamStats = statsMap.get(team._id.toString()) ?? { totalWrong: 0, recentWrong: 0 }
+
+      return {
+        rank: index + 1,
+        teamName: team.teamName,
+        solvedCount: team.solvedCount,
+        currentLevel: team.currentLevel,
+        lastSolvedAt: team.lastSolvedAt,
+        lastActive: team.lastActive,
+        createdAt: team.createdAt,
+        teamId: team._id.toString(),
+        suspicious: teamStats.recentWrong >= SUSPICIOUS_THRESHOLD,
+        totalWrongAttempts: teamStats.totalWrong,
+      }
+    })
 
     return NextResponse.json({ leaderboard, total: teams.length })
   } catch (err) {

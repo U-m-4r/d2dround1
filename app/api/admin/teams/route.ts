@@ -21,33 +21,60 @@ export async function GET(req: NextRequest) {
       .sort({ solvedCount: -1, lastSolvedAt: 1 })
       .lean()
 
-    // Enrich with suspicious activity flag (>10 wrong in <5min)
-    const enriched = await Promise.all(
-      teams.map(async (team) => {
-        const recentWrong = await Submission.countDocuments({
-          teamId: team._id,
-          isCorrect: false,
-          submittedAt: { $gte: new Date(Date.now() - 5 * 60 * 1000) },
-        })
+    // 1. Fetch aggregation stats for all teams in ONE single database query
+    const now = new Date()
+    const fiveMinsAgo = new Date(now.getTime() - 5 * 60 * 1000)
 
-        const totalWrong = await Submission.countDocuments({
-          teamId: team._id,
+    const stats = await Submission.aggregate([
+      {
+        $match: {
           isCorrect: false,
-        })
+        },
+      },
+      {
+        $group: {
+          _id: '$teamId',
+          totalWrong: { $sum: 1 },
+          recentWrong: {
+            $sum: {
+              $cond: [
+                { $gte: ['$submittedAt', fiveMinsAgo] },
+                1,
+                0,
+              ],
+            },
+          },
+        },
+      },
+    ])
 
-        return {
-          teamId: team._id.toString(),
-          teamName: team.teamName,
-          solvedCount: team.solvedCount,
-          currentLevel: team.currentLevel,
-          lastSolvedAt: team.lastSolvedAt,
-          lastActive: team.lastActive,
-          createdAt: team.createdAt,
-          suspicious: recentWrong >= 10,
-          totalWrongAttempts: totalWrong,
-        }
-      })
-    )
+    // Convert stats array to a quick O(1) lookup Map
+    const statsMap = new Map<string, { totalWrong: number; recentWrong: number }>()
+    stats.forEach((item) => {
+      if (item._id) {
+        statsMap.set(item._id.toString(), {
+          totalWrong: item.totalWrong || 0,
+          recentWrong: item.recentWrong || 0,
+        })
+      }
+    })
+
+    // 2. Map and enrich team objects quickly without any nested database queries
+    const enriched = teams.map((team) => {
+      const teamStats = statsMap.get(team._id.toString()) ?? { totalWrong: 0, recentWrong: 0 }
+
+      return {
+        teamId: team._id.toString(),
+        teamName: team.teamName,
+        solvedCount: team.solvedCount,
+        currentLevel: team.currentLevel,
+        lastSolvedAt: team.lastSolvedAt,
+        lastActive: team.lastActive,
+        createdAt: team.createdAt,
+        suspicious: teamStats.recentWrong >= 10,
+        totalWrongAttempts: teamStats.totalWrong,
+      }
+    })
 
     return NextResponse.json({ teams: enriched, total: teams.length })
   } catch (err) {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSessionFromCookies } from '@/lib/auth'
 import { connectDB } from '@/lib/db'
 import { checkRateLimit } from '@/lib/rateLimit'
-import { isRoundStarted, isRoundPaused, isRoundEnded } from '@/lib/round'
+import { getRoundStatuses } from '@/lib/round'
 import Team from '@/models/Team'
 import Clue from '@/models/Clue'
 import Submission from '@/models/Submission'
@@ -50,21 +50,23 @@ export async function POST(req: NextRequest) {
   try {
     await connectDB()
 
-    if (!(await isRoundStarted())) {
+    const { isStarted, isPaused, isEnded } = await getRoundStatuses()
+
+    if (!isStarted) {
       return NextResponse.json(
         { error: 'ROUND_NOT_STARTED', message: 'The round has not started yet.' },
         { status: 403 }
       )
     }
 
-    if (await isRoundPaused()) {
+    if (isPaused) {
       return NextResponse.json(
         { error: 'ROUND_PAUSED', message: 'The round is currently paused for a break.' },
         { status: 403 }
       )
     }
 
-    if (await isRoundEnded()) {
+    if (isEnded) {
       return NextResponse.json(
         { error: 'ROUND_ENDED', message: 'The round has ended.' },
         { status: 403 }
@@ -165,11 +167,18 @@ export async function POST(req: NextRequest) {
         clueId: nextLevel,
       })
       if (!alreadyUnlocked) {
-        await ClueProgress.create({
-          teamId: team._id,
-          clueId: nextLevel,
-          unlockedAt: now,
-        })
+        try {
+          await ClueProgress.create({
+            teamId: team._id,
+            clueId: nextLevel,
+            unlockedAt: now,
+          })
+        } catch (err: any) {
+          // Swallow E11000 duplicate key error since concurrent requests might have created it
+          if (err.code !== 11000) {
+            throw err
+          }
+        }
       }
     }
 
