@@ -8,7 +8,7 @@ interface RateLimitEntry {
 
 const store = new Map<string, RateLimitEntry>()
 
-const MAX_ATTEMPTS = 5
+const MAX_ATTEMPTS = 2
 const WINDOW_MS = 30_000 // 30 seconds
 
 export function checkRateLimit(key: string): {
