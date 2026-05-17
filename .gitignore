@@ -7,3 +7,4 @@ node_modules/
 Thumbs.db
 Team_Passwords.csv
 process_logo.py
+scripts/seed-real-clues.ts
