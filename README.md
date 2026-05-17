@@ -6,7 +6,7 @@ Designed with a heavy cyberpunk, "dark dev", and MPC Hacks inspired aesthetic, t
 
 ---
 
-## 🏗️ Architecture & Stack
+## 🏗️ Architecture & Stackk
 
 - **Frontend**: Next.js 16 (App Router), React, Tailwind CSS, Framer Motion
 - **Backend API**: Next.js Route Handlers (`app/api/...`)
